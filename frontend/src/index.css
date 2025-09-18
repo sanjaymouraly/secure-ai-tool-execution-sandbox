@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+/* Tailwind v4 scans the project automatically; these directives make the
+   source set explicit so a build never depends on the auto-detection. */
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
+
+/* Class based dark mode: the `dark` class on <html> switches the theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-surface: rgb(var(--surface) / <alpha-value>);
+  --color-surface-raised: rgb(var(--surface-raised) / <alpha-value>);
+  --color-surface-sunken: rgb(var(--surface-sunken) / <alpha-value>);
+  --color-ink: rgb(var(--ink) / <alpha-value>);
+  --color-ink-muted: rgb(var(--ink-muted) / <alpha-value>);
+  --color-ink-faint: rgb(var(--ink-faint) / <alpha-value>);
+  --color-edge: rgb(var(--edge) / <alpha-value>);
+  --color-brand: rgb(var(--brand) / <alpha-value>);
+  --color-brand-soft: rgb(var(--brand-soft) / <alpha-value>);
+  --color-ok: rgb(var(--ok) / <alpha-value>);
+  --color-warn: rgb(var(--warn) / <alpha-value>);
+  --color-danger: rgb(var(--danger) / <alpha-value>);
+  --color-info: rgb(var(--info) / <alpha-value>);
+
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px -12px rgb(0 0 0 / 0.18);
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm
+         font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@layer base {
+  :root {
+    --surface: 249 250 252;
+    --surface-raised: 255 255 255;
+    --surface-sunken: 241 243 247;
+    --ink: 17 24 39;
+    --ink-muted: 75 85 99;
+    --ink-faint: 156 163 175;
+    --edge: 226 229 235;
+    --brand: 37 99 235;
+    --brand-soft: 219 234 254;
+    --ok: 22 163 74;
+    --warn: 217 119 6;
+    --danger: 220 38 38;
+    --info: 14 116 144;
+  }
+
+  .dark {
+    --surface: 10 13 20;
+    --surface-raised: 19 24 35;
+    --surface-sunken: 7 9 15;
+    --ink: 226 232 240;
+    --ink-muted: 148 163 184;
+    --ink-faint: 100 116 139;
+    --edge: 39 47 62;
+    --brand: 96 165 250;
+    --brand-soft: 30 58 138;
+    --ok: 74 222 128;
+    --warn: 251 191 36;
+    --danger: 248 113 113;
+    --info: 56 189 248;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-surface text-ink antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04";
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand ring-offset-2 ring-offset-surface;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink-faint/40;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-faint/70;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-edge bg-surface-raised shadow-panel;
+  }
+
+  .panel-header {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-edge px-5 py-4;
+  }
+
+  .panel-title {
+    @apply text-sm font-semibold tracking-tight text-ink;
+  }
+
+  .panel-subtitle {
+    @apply text-xs text-ink-muted;
+  }
+
+  .btn-primary {
+    @apply btn border-transparent bg-brand text-white hover:opacity-90;
+  }
+
+  .btn-secondary {
+    @apply btn border-edge bg-surface-raised text-ink hover:bg-surface-sunken;
+  }
+
+  .btn-danger {
+    @apply btn border-transparent bg-danger text-white hover:opacity-90;
+  }
+
+  .btn-ghost {
+    @apply btn border-transparent text-ink-muted hover:bg-surface-sunken hover:text-ink;
+  }
+
+  .btn-sm {
+    @apply px-2.5 py-1.5 text-xs;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-ink
+           placeholder:text-ink-faint focus:border-brand;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-ink-muted;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .mono {
+    @apply font-mono text-[12px] leading-relaxed;
+  }
+
+  .table-wrap {
+    @apply overflow-x-auto;
+  }
+
+  .data-table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+
+  .data-table thead th {
+    @apply whitespace-nowrap border-b border-edge bg-surface-sunken px-4 py-2.5 text-xs
+           font-semibold uppercase tracking-wide text-ink-muted;
+  }
+
+  .data-table tbody td {
+    @apply border-b border-edge/70 px-4 py-2.5 align-top text-ink;
+  }
+
+  .data-table tbody tr:hover {
+    @apply bg-surface-sunken/60;
+  }
+
+  .code-block {
+    @apply overflow-x-auto rounded-lg border border-edge bg-surface-sunken p-3 font-mono
+           text-[12px] leading-relaxed text-ink;
+  }
+}

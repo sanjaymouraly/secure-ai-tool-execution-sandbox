@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+backend/.env.development
+*.pem
+*.key
+secrets/
+
+# Application data
+backend/data/
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
+data/
+*.sqlite
+*.sqlite3
+
+# Job workspaces
+/tmp/saxis-jobs/
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+.cache/
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Build artefacts
+build/
+dist/
+*.tsbuildinfo
+
+# Local caches and generated files
+coverage/
+.next/
+CHANGELOG.md

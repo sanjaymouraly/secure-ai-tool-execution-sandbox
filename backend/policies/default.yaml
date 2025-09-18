@@ -1,0 +1,231 @@
+# ---------------------------------------------------------------------------
+# Secure AI Tool Execution & Permission Sandbox - default policy
+#
+# Evaluation order: descending `priority`, then ascending `id`.
+# The first rule that matches decides.  When no rule matches, the document
+# default applies (deny).
+#
+# Hard guards implemented in code (backend/app/policy/guards.py) run BEFORE
+# these rules and can never be relaxed by a policy change.
+# ---------------------------------------------------------------------------
+version: "2.0.0"
+revision: 1
+name: default
+description: >-
+  Least-privilege default policy.  Read-only inspection of the approved
+  workspace is allowed; anything that writes, executes or reaches outside the
+  approved workspace requires explicit human approval.
+
+defaults:
+  effect: deny
+  reason: "Default deny: no policy rule matched this request"
+
+tool_risk:
+  list_files: low
+  read_file: low
+  search_files: low
+  inspect_metadata: low
+  calculate_hash: low
+  read_artifact: low
+  view_execution_result: low
+  request_permission: medium
+  create_artifact: medium
+  run_python_sandboxed: high
+  execute_approved_command: high
+
+rules:
+  # ------------------------------------------------------------------ deny
+  - id: deny-protected-workspace-paths
+    description: "Files inside the protected/ tree may never be read or written by the agent."
+    effect: deny
+    priority: 950
+    tools: ["*"]
+    constraints:
+      path_prefixes:
+        - "protected"
+        - "protected/"
+        - ".secrets"
+        - ".secrets/"
+    reason: "The protected/ tree is off limits to AI agents by administrator policy."
+
+  - id: deny-secret-like-filenames
+    description: "Deny access to files whose names look like credential material."
+    effect: deny
+    priority: 940
+    tools: ["*"]
+    constraints:
+      path_regex:
+        - "(?i)(^|/)(\\.env(\\.|$)|id_rsa|.*\\.(pem|key|p12|pfx|keystore)|credentials?\\.(json|ya?ml)|secrets?\\.(json|ya?ml|txt)|.*\\.netrc)$"
+    reason: "Files that appear to hold credentials may not be accessed by AI agents."
+
+  - id: deny-network-commands
+    description: "Never allow commands that can open a network connection."
+    effect: deny
+    priority: 930
+    tools: ["execute_approved_command", "run_python_sandboxed"]
+    constraints:
+      command_names:
+        - curl
+        - wget
+        - nc
+        - ncat
+        - netcat
+        - ssh
+        - scp
+        - sftp
+        - telnet
+        - ftp
+        - rsync
+        - dig
+        - nslookup
+        - host
+        - ping
+    reason: "Outbound network access from a sandboxed command is prohibited by default."
+
+  - id: deny-destructive-commands
+    description: "Never allow destructive or privilege escalating commands."
+    effect: deny
+    priority: 920
+    tools: ["execute_approved_command", "run_python_sandboxed"]
+    constraints:
+      command_names:
+        - rm
+        - rmdir
+        - mv
+        - dd
+        - mkfs
+        - fdisk
+        - shutdown
+        - reboot
+        - halt
+        - poweroff
+        - chmod
+        - chown
+        - chgrp
+        - mount
+        - umount
+        - sudo
+        - su
+        - doas
+        - kill
+        - killall
+        - pkill
+        - useradd
+        - userdel
+        - usermod
+        - groupadd
+        - passwd
+        - chpasswd
+        - visudo
+        - mount
+        - nsenter
+        - unshare
+        - chroot
+        - iptables
+        - nft
+        - sysctl
+        - systemctl
+        - service
+        - apt
+        - apt-get
+        - dpkg
+        - pip
+        - pip3
+        - gem
+        - npm
+        - docker
+        - podman
+        - kubectl
+        - git
+    reason: "Destructive and privilege escalating commands are prohibited."
+
+  # ----------------------------------------------------------------- allow
+  - id: allow-inspect-workspace
+    description: "Allow read-only inspection of files inside the approved workspace."
+    effect: allow
+    priority: 500
+    tools:
+      - list_files
+      - search_files
+      - inspect_metadata
+      - calculate_hash
+    subjects:
+      users: ["*"]
+      roles: ["admin", "approver", "analyst", "viewer"]
+    reason: "Read-only inspection inside the approved workspace is permitted."
+
+  - id: allow-read-approved-documents
+    description: "Allow reading approved text documents from the workspace."
+    effect: allow
+    priority: 490
+    tools: ["read_file"]
+    constraints:
+      allowed_extensions:
+        - .txt
+        - .md
+        - .markdown
+        - .json
+        - .yaml
+        - .yml
+        - .csv
+        - .log
+        - .py
+        - .toml
+        - .ini
+        - .cfg
+        - .conf
+        - .html
+        - .xml
+        - .rst
+        - .sql
+        - .ts
+        - .tsx
+        - .js
+        - .jsx
+    reason: "Reading approved text documents is permitted for analysis workflows."
+
+  - id: allow-read-artifact
+    description: "Allow reading artifacts that were previously created in this session."
+    effect: allow
+    priority: 480
+    tools: ["read_artifact"]
+    reason: "Artifacts created by the agent are readable so results can be inspected."
+
+  - id: allow-view-execution-result
+    description: "Allow the agent to inspect the result of a previous execution."
+    effect: allow
+    priority: 470
+    tools: ["view_execution_result"]
+    reason: "Reading prior execution results does not touch the host."
+
+  - id: allow-request-permission
+    description: "Allow the agent to ask a human for additional permission."
+    effect: allow
+    priority: 460
+    tools: ["request_permission"]
+    reason: "Requesting permission is the sanctioned escalation path."
+
+  # ------------------------------------------------------------- approvals
+  - id: approve-command-execution
+    description: "Approved commands always require an explicit human approval."
+    effect: require_approval
+    priority: 400
+    tools: ["execute_approved_command"]
+    requires_approval: true
+    reason: "Command execution requires a human approval for this exact command line."
+
+  - id: approve-sandboxed-python
+    description: "Running sandboxed Python requires an explicit human approval."
+    effect: require_approval
+    priority: 390
+    tools: ["run_python_sandboxed"]
+    requires_approval: true
+    reason: "Sandboxed script execution requires a human approval for this exact script."
+
+  - id: approve-artifact-write
+    description: "Creating an artifact requires an explicit human approval."
+    effect: require_approval
+    priority: 380
+    tools: ["create_artifact"]
+    requires_approval: true
+    reason: "Writing an artifact requires a human approval for this exact content."

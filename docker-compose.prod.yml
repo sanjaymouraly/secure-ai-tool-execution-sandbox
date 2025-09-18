@@ -1,0 +1,135 @@
+# ---------------------------------------------------------------------------
+# Production stack.
+#
+#   SAxis_SECRET_KEY=... docker compose -f docker-compose.prod.yml up -d
+#
+# The stack binds to 127.0.0.1 only.  Put a TLS terminating reverse proxy in
+# front of it - see docs/deployment.md.  The control plane is the only
+# container that can talk to the Docker daemon; the sandbox workers are
+# started by the broker with no access to it.
+# ---------------------------------------------------------------------------
+name: secure-ai-sandbox-prod
+
+services:
+  # The hardened image every sandboxed execution runs in.
+  sandbox-image:
+    build:
+      context: .
+      dockerfile: docker/sandbox/Dockerfile
+    image: secure-ai-sandbox-runner:${SAXIS_VERSION:-1.0.0}
+    # The image is only built here; the container does nothing.
+    entrypoint: ["/bin/true"]
+    command: []
+    restart: "no"
+
+  # The Docker daemon resolves every bind mount source on the *host*, so the
+  # per-job workspace directory must exist on the host and be writable by the
+  # control plane user.  This one-shot service prepares it.
+  job-root-init:
+    image: busybox:1.36
+    user: root
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /tmp/saxis-jobs &&
+        chmod 1777 /tmp/saxis-jobs &&
+        echo "the per-job workspace directory is ready"
+    volumes:
+      - /tmp/saxis-jobs:/tmp/saxis-jobs
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    image: secure-ai-sandbox-backend:${SAXIS_VERSION:-1.0.0}
+    restart: always
+    depends_on:
+      sandbox-image:
+        condition: service_completed_successfully
+      job-root-init:
+        condition: service_completed_successfully
+    environment:
+      SAXIS_ENVIRONMENT: production
+      SAXIS_SECRET_KEY: ${SAXIS_SECRET_KEY:?set SAXIS_SECRET_KEY}
+      SAXIS_PROVIDER_SECRET_KEY: ${SAXIS_PROVIDER_SECRET_KEY:?set SAXIS_PROVIDER_SECRET_KEY}
+      SAXIS_DATABASE_URL: ${SAXIS_DATABASE_URL:-sqlite:////app/data/sandbox.db}
+      SAXIS_WORKSPACE_ROOT: /workspace
+      SAXIS_ARTIFACT_ROOT: /app/data/artifacts
+      # The job root and the seccomp profile MUST be mounted at the same
+      # absolute path on the host and in the container: the Docker daemon
+      # resolves every bind mount source on the host filesystem.
+      SAXIS_JOB_ROOT: /tmp/saxis-jobs
+      SAXIS_SANDBOX_SECCOMP_PROFILE_PATH: /etc/saxis/seccomp.json
+      SAXIS_AUTH_MODE: multiuser
+      SAXIS_BOOTSTRAP_ADMIN_USERNAME: ${SAXIS_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      SAXIS_BOOTSTRAP_ADMIN_PASSWORD: ${SAXIS_BOOTSTRAP_ADMIN_PASSWORD:?set a bootstrap password}
+      SAXIS_ALLOWED_ORIGINS: ${SAXIS_ALLOWED_ORIGINS:-https://sandbox.example.com}
+      SAXIS_SANDBOX_BACKEND: docker
+      SAXIS_SANDBOX_IMAGE: secure-ai-sandbox-runner:${SAXIS_VERSION:-1.0.0}
+      SAXIS_SANDBOX_DENY_NETWORK: "true"
+      SAXIS_DEFAULT_PROVIDER: ${SAXIS_DEFAULT_PROVIDER:-ollama}
+      SAXIS_PROVIDER_BASE_URL: ${SAXIS_PROVIDER_BASE_URL:-}
+      SAXIS_PROVIDER_MODEL: ${SAXIS_PROVIDER_MODEL:-}
+      SAXIS_PROVIDER_API_KEY: ${SAXIS_PROVIDER_API_KEY:-}
+      SAXIS_BUDGET_SESSION_USD: ${SAXIS_BUDGET_SESSION_USD:-1.00}
+      SAXIS_BUDGET_DAILY_USD: ${SAXIS_BUDGET_DAILY_USD:-10.00}
+      SAXIS_AUDIT_RETENTION_DAYS: ${SAXIS_AUDIT_RETENTION_DAYS:-90}
+    group_add:
+      - "${SAXIS_DOCKER_GID:-999}"
+    volumes:
+      - ./sandbox_workspace:/workspace:ro
+      - backend-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/saxis-jobs:/tmp/saxis-jobs
+      - ./docker/seccomp/sandbox.json:/etc/saxis/seccomp.json:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sandbox
+    # Not published: only the reverse proxy reaches the control plane.
+    expose:
+      - "8000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    image: secure-ai-sandbox-frontend:${SAXIS_VERSION:-1.0.0}
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - sandbox
+    expose:
+      - "80"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:rw,noexec,nosuid,nodev,size=32m
+      - /var/run:rw,noexec,nosuid,nodev,size=8m
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+
+volumes:
+  backend-data:
+
+networks:
+  sandbox:
+    driver: bridge

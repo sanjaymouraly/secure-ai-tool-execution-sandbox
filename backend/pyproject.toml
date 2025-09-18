@@ -1,0 +1,106 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "secure-ai-tool-execution-sandbox"
+version = "1.0.0"
+description = "Secure AI Tool Execution & Permission Sandbox"
+requires-python = ">=3.12"
+readme = "../README.md"
+license = { text = "MIT" }
+authors = [{ name = "Sanjay Mouraly", email = "sanjaymouraly@users.noreply.github.com" }]
+keywords = ["ai-security", "sandbox", "policy-engine", "prompt-injection", "agents"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+dynamic = ["dependencies", "optional-dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+optional-dependencies.dev = { file = ["requirements-dev.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers"
+markers = [
+    "docker: requires a running Docker daemon",
+    "slow: long running test",
+    "e2e: end to end browser test",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:starlette.*",
+    "ignore::DeprecationWarning:fastapi.*",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+exclude = [".venv", "data", "node_modules"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "S",   # bandit
+    "C4",  # comprehensions
+    "SIM", # simplify
+    "RUF",
+]
+ignore = [
+    "S101",  # assert - used in tests
+    "B008",  # function call in default argument
+    "SIM108", # ternary
+    "RUF001", "RUF002", "RUF003",  # ambiguous unicode
+    "E501",  # line length is handled by the formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "B", "E501", "SIM117", "RUF"]
+"app/api/routes/*.py" = ["B008"]
+"app/core/container.py" = ["B008"]
+# The job root is a private, per-run directory, not a shared world-writable path.
+"app/core/config.py" = ["S108"]
+# A list of forbidden host prefixes, not a file path.
+"app/core/paths.py" = ["S108"]
+# An unresolvable path is reported by the hard guard; the candidate list skips it.
+"app/policy/engine.py" = ["S112"]
+# The bind-mount permissions and the container tmpfs are deliberate.
+"app/sandbox/docker_backend.py" = ["S103", "S108"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+ignore_missing_imports = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+exclude = ["tests/", "data/"]
+plugins = []
+
+[tool.bandit]
+exclude_dirs = [".venv", "tests", "data"]
+skips = []
+
+[project.urls]
+Homepage = "https://github.com/sanjaymouraly/secure-ai-tool-execution-sandbox"
+Repository = "https://github.com/sanjaymouraly/secure-ai-tool-execution-sandbox"
+Issues = "https://github.com/sanjaymouraly/secure-ai-tool-execution-sandbox/issues"
